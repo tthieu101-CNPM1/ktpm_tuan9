@@ -1,0 +1,37 @@
+[
+  {
+    "username": "standard_user",
+    "password": "secret_sauce",
+    "role": "user",
+    "expectSuccess": true,
+    "description": "User chuẩn đăng nhập thành công"
+  },
+  {
+    "username": "locked_out_user",
+    "password": "secret_sauce",
+    "role": "user",
+    "expectSuccess": false,
+    "description": "User bị khóa tài khoản"
+  },
+  {
+    "username": "problem_user",
+    "password": "secret_sauce",
+    "role": "user",
+    "expectSuccess": true,
+    "description": "User bị lỗi hiển thị sản phẩm"
+  },
+  {
+    "username": "performance_glitch_user",
+    "password": "secret_sauce",
+    "role": "user",
+    "expectSuccess": true,
+    "description": "User bị delay khi đăng nhập"
+  },
+  {
+    "username": "admin_user",
+    "password": "wrong_pass",
+    "role": "admin",
+    "expectSuccess": false,
+    "description": "Sai mật khẩu đăng nhập"
+  }
+]
