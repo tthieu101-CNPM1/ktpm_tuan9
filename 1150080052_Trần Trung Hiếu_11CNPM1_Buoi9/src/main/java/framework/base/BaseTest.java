@@ -1,13 +1,15 @@
 package framework.base;
 
-import framework.config.ConfigReader; // Bắt buộc phải import ConfigReader
+import framework.config.ConfigReader;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.firefox.FirefoxDriver;
+import org.openqa.selenium.firefox.FirefoxOptions;
 import org.testng.ITestResult;
 import org.testng.annotations.AfterMethod;
 import org.testng.annotations.BeforeMethod;
@@ -22,7 +24,7 @@ import java.time.Duration;
 import java.util.Date;
 
 public abstract class BaseTest {
-    // Dùng ThreadLocal để chạy song song an toàn, không sợ crash khi mở nhiều tab [cite: 288-289]
+    // Sử dụng ThreadLocal để đảm bảo an toàn khi chạy song song (Parallel Testing) [cite: 288-289]
     private static ThreadLocal<WebDriver> tlDriver = new ThreadLocal<>();
 
     protected WebDriver getDriver() {
@@ -32,33 +34,47 @@ public abstract class BaseTest {
     @Parameters({"browser", "env"})
     @BeforeMethod(alwaysRun = true)
     public void setUp(@Optional("chrome") String browser, @Optional("dev") String env) {
-        // 1. Set biến môi trường TRƯỚC khi khởi tạo ConfigReader [cite: 294-296]
+        // Thiết lập biến môi trường trước khi khởi tạo cấu hình [cite: 294-296]
         System.setProperty("env", env);
 
-        // 2. Khởi tạo Driver hỗ trợ chạy nhiều trình duyệt
+        // Kiểm tra xem có đang chạy trên môi trường CI (GitHub Actions) hay không [cite: 118, 702]
+        boolean isCI = System.getenv("CI") != null;
         WebDriver driver;
+
         switch (browser.toLowerCase()) {
             case "firefox":
                 WebDriverManager.firefoxdriver().setup();
-                driver = new FirefoxDriver();
+                FirefoxOptions ffOptions = new FirefoxOptions();
+                if (isCI) {
+                    ffOptions.addArguments("-headless"); // Kích hoạt headless cho Firefox trên CI [cite: 156, 723]
+                }
+                driver = new FirefoxDriver(ffOptions);
                 break;
+
             case "edge":
                 WebDriverManager.edgedriver().setup();
                 driver = new EdgeDriver();
                 break;
+
             case "chrome":
             default:
                 WebDriverManager.chromedriver().setup();
-                driver = new ChromeDriver();
+                ChromeOptions chromeOptions = new ChromeOptions();
+                if (isCI) {
+                    // Cấu hình Chrome chạy Headless bắt buộc trên Linux CI [cite: 129, 132, 135, 710, 711, 714]
+                    chromeOptions.addArguments("--headless=new");
+                    chromeOptions.addArguments("--no-sandbox");
+                    chromeOptions.addArguments("--disable-dev-shm-usage"); // Tránh lỗi tràn bộ nhớ (OOM)
+                    chromeOptions.addArguments("--window-size=1920,1080"); // Đặt độ phân giải cố định [cite: 136, 715]
+                } else {
+                    chromeOptions.addArguments("--start-maximized");
+                }
+                driver = new ChromeDriver(chromeOptions);
                 break;
         }
 
-        driver.manage().window().maximize();
-
-        // 3. Dùng ConfigReader đọc timeout thay vì hardcode 5 giây [cite: 508-510]
+        // Cấu hình timeouts và URL từ ConfigReader [cite: 503, 508]
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(ConfigReader.getInstance().getImplicitWait()));
-
-        // 4. Dùng ConfigReader đọc URL thay vì hardcode "https://www.saucedemo.com" [cite: 503-504]
         driver.get(ConfigReader.getInstance().getBaseUrl());
 
         tlDriver.set(driver);
@@ -66,12 +82,12 @@ public abstract class BaseTest {
 
     @AfterMethod(alwaysRun = true)
     public void tearDown(ITestResult result) {
-        // Chụp ảnh màn hình nếu test bị FAIL [cite: 304-306]
+        // Tự động chụp ảnh màn hình nếu kịch bản kiểm thử thất bại [cite: 202, 304, 1006]
         if (result.getStatus() == ITestResult.FAILURE) {
             captureScreenshot(result.getName());
         }
 
-        // Dọn dẹp an toàn tránh memory leak [cite: 314-316]
+        // Giải phóng driver để tránh rò rỉ bộ nhớ [cite: 314, 1009]
         if (getDriver() != null) {
             getDriver().quit();
             tlDriver.remove();
@@ -82,14 +98,14 @@ public abstract class BaseTest {
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String fileName = testName + "_" + timestamp + ".png";
         File srcFile = ((TakesScreenshot) getDriver()).getScreenshotAs(OutputType.FILE);
-        File destFile = new File("target/screenshots/" + fileName);
+        File destFile = new File(ConfigReader.getInstance().getScreenshotPath() + fileName);
 
         try {
-            destFile.getParentFile().mkdirs(); // Tự động tạo thư mục screenshots nếu chưa có
+            destFile.getParentFile().mkdirs(); 
             Files.copy(srcFile.toPath(), destFile.toPath());
-            System.out.println("Screenshot saved successfully at: " + destFile.getAbsolutePath());
+            System.out.println("[Log] Screenshot saved at: " + destFile.getAbsolutePath());
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("[Error] Could not save screenshot: " + e.getMessage());
         }
     }
 }
