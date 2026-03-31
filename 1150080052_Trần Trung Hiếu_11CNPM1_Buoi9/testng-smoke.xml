@@ -1,1 +1,20 @@
 
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<suite name="Lab9_POM_Suite">
+
+    <listeners>
+        <listener class-name="framework.utils.RetryListener"/>
+    </listeners>
+
+    <test name="Data Driven and Flaky Tests">
+        <classes>
+            <class name="tests.LoginDDTTest"/>
+
+            <class name="tests.UserLoginTest"/>
+
+            <class name="tests.CheckoutTest"/>
+
+            <class name="tests.FlakySimulationTest"/>
+        </classes>
+    </test>
+</suite>
